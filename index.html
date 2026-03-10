@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PulseWarp - Mobile Rhythm</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
 
@@ -65,11 +66,6 @@
             animation: pulse 1s infinite;
         }
 
-        .warp-active {
-            box-shadow: 0 0 30px #22d3ee;
-            animation: pulse 0.2s infinite;
-        }
-
         @keyframes pulse {
 
             0%,
@@ -103,7 +99,8 @@
             transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: none;
             z-index: 50;
-            white-space: nowrap;
+            white-space: pre-wrap;
+            line-height: 1.1;
         }
 
         .shoutout-active {
@@ -181,10 +178,8 @@
             </div>
         </div>
 
-        <!-- The Shoutout Text Element -->
         <div id="shoutout-text">10 COMBO!</div>
 
-        <!-- Center Screen Life Loss Animation Container -->
         <div id="life-loss-display"
             class="absolute top-[30%] left-0 w-full flex justify-center pointer-events-none z-40 opacity-0">
             <div id="hearts-container" class="flex gap-3 text-pink-500 drop-shadow-[0_0_15px_rgba(236,72,153,1)]">
@@ -193,11 +188,9 @@
 
         <canvas id="gameCanvas" class="z-0"></canvas>
 
-        <!-- Start Screen with Animated Canvas Background -->
         <div id="menu"
             class="absolute inset-0 flex items-center justify-center z-20 overflow-hidden bg-slate-900 cursor-pointer"
             onclick="startGame()">
-            <!-- Animated Splash Screen Canvas -->
             <canvas id="menuCanvas" class="absolute inset-0 w-full h-full object-cover z-0"></canvas>
 
             <div class="absolute bottom-16 w-full text-center pointer-events-none z-10">
@@ -207,7 +200,6 @@
             </div>
         </div>
 
-        <!-- Game Over Screen -->
         <div id="game-over" class="absolute inset-0 hidden items-center justify-center modal z-30 p-6 text-center">
             <div class="max-w-sm w-full">
                 <h1 id="end-status" class="text-4xl font-black text-white mb-2">SESSION ENDED</h1>
@@ -242,7 +234,6 @@
         let menuAnimId;
         let menuTime = 0;
 
-        // Persistent stars for the menu background
         const menuStars = Array.from({ length: 100 }, () => ({
             x: Math.random(),
             y: Math.random(),
@@ -262,7 +253,6 @@
             const cx = menuCanvas.width / 2;
             const cy = menuCanvas.height / 2;
 
-            // 1. Deep Space Background
             const bgGrad = menuCtx.createLinearGradient(0, 0, 0, menuCanvas.height);
             bgGrad.addColorStop(0, '#020617');
             bgGrad.addColorStop(0.5, '#0f172a');
@@ -270,7 +260,6 @@
             menuCtx.fillStyle = bgGrad;
             menuCtx.fillRect(0, 0, menuCanvas.width, menuCanvas.height);
 
-            // 2. Drifting Stars
             menuCtx.fillStyle = 'rgba(255, 255, 255, 0.6)';
             menuStars.forEach(star => {
                 star.y += star.speed * 0.002;
@@ -283,7 +272,6 @@
                 menuCtx.fill();
             });
 
-            // 3. Perspective Lanes (The Groove)
             const vpY = menuCanvas.height * 0.40;
 
             const trailGrad = menuCtx.createLinearGradient(0, vpY, 0, menuCanvas.height);
@@ -307,7 +295,6 @@
                 menuCtx.stroke();
             }
 
-            // Animated Horizontal Grid Lines
             menuCtx.strokeStyle = 'rgba(236, 72, 153, 0.3)';
             const gridSpeed = (menuTime * 60) % 20;
             for (let i = 1; i < 25; i++) {
@@ -322,7 +309,6 @@
                 menuCtx.stroke();
             }
 
-            // 4. Hovering Hyper-Diamond
             const dx = cx;
             const dy = menuCanvas.height * 0.60 + Math.sin(menuTime * 1.5) * 20;
             const dSize = Math.min(menuCanvas.width * 0.25, 120);
@@ -357,7 +343,6 @@
             menuCtx.fill();
             menuCtx.shadowBlur = 0;
 
-            // 5. The Logo
             menuCtx.textAlign = 'center';
             menuCtx.textBaseline = 'middle';
             const fontSize = Math.min(menuCanvas.width * 0.18, 140);
@@ -365,23 +350,20 @@
 
             const titleY = menuCanvas.height * 0.18;
 
-            // "PULSE"
             menuCtx.fillStyle = '#ffffff';
             menuCtx.shadowBlur = 40;
             menuCtx.shadowColor = 'rgba(255,255,255,0.5)';
             menuCtx.fillText('PULSE', cx, titleY);
 
-            // "WARP"
-            menuCtx.fillStyle = '#22d3ee'; // Cyan
+            menuCtx.fillStyle = '#22d3ee';
             menuCtx.shadowBlur = 60;
             menuCtx.shadowColor = '#22d3ee';
             menuCtx.fillText('WARP', cx, titleY + fontSize * 0.9);
-            menuCtx.shadowBlur = 0; // reset
+            menuCtx.shadowBlur = 0;
 
             menuAnimId = requestAnimationFrame(drawMenu);
         }
 
-        // Ensure font loads completely before showing text accurately
         document.fonts.ready.then(function () {
             drawMenu();
         });
@@ -409,10 +391,6 @@
             lives: 5,
             isFeverActive: false,
             feverMeasures: 0,
-            isClearingForSpecial: false,
-            isSpecialDropping: false,
-            isSuperRushActive: false,
-            superRushMeasures: 0,
             gameActive: false,
             lastFrame: 0,
             shake: 0,
@@ -426,10 +404,8 @@
         const config = {
             targetY: 0,
             laneCount: 4,
-            baseNoteSpeed: 300,
-            baseSpawnRate: 1.0,
-            perfectZone: 60, // Increased for mobile leniency
-            hitRange: 140,   // Widened overall hit window
+            perfectZone: 0.10,
+            hitRange: 0.25,
             measuresPerLevel: 16
         };
 
@@ -438,7 +414,6 @@
         let lanes = [];
         let lanePulses = [0, 0, 0, 0];
         let audioEngine = null;
-        let spawnTimeout = null;
 
         function triggerShoutout(text, pitch = 1.0) {
             shoutoutText.innerText = text;
@@ -455,48 +430,92 @@
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.pitch = pitch;
                 utterance.rate = 1.3;
-                utterance.volume = 0.8;
+                utterance.volume = 1.0;
                 window.speechSynthesis.speak(utterance);
             }
         }
 
         class AudioEngine {
             constructor() {
-                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
                 this.isPlaying = false;
                 this.timerID = null;
 
-                this.bpm = 120;
+                this.bpm = 135;
                 this.bar = 0;
-                this.nextNoteTime = this.ctx.currentTime + 0.1;
+                this.nextNoteTime = 0;
                 this.step = 0;
                 this.chords = [];
-                this.bassType = 'square';
-                this.leadType = 'sawtooth';
+                this.kickTimes = [];
+                this.AUDIO_LOOKAHEAD = 2.0;
+                this.arpIndex = 0;
+
+                this.reverb = new Tone.Reverb({ decay: 4.0, wet: 0.4 }).toDestination();
+                this.delay = new Tone.PingPongDelay("8n.", 0.3).connect(this.reverb);
+
+                this.kick = new Tone.MembraneSynth({
+                    pitchDecay: 0.06,
+                    octaves: 5,
+                    oscillator: { type: 'sine' },
+                    envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4 }
+                }).toDestination();
+                this.kick.volume.value = 2;
+
+                this.snare = new Tone.NoiseSynth({
+                    noise: { type: 'white' },
+                    envelope: { attack: 0.001, decay: 0.2, sustain: 0 }
+                }).toDestination();
+                this.snare.volume.value = -14;
+
+                this.hat = new Tone.NoiseSynth({
+                    noise: { type: 'white' },
+                    envelope: { attack: 0.001, decay: 0.05, sustain: 0 }
+                }).toDestination();
+                this.hat.volume.value = -20;
+
+                this.bass = new Tone.Synth({
+                    oscillator: { type: "sawtooth" },
+                    envelope: { attack: 0.01, decay: 0.2, sustain: 0.0, release: 0.2 }
+                });
+                this.bassFilter = new Tone.Filter(600, "lowpass").toDestination();
+                this.bass.connect(this.bassFilter);
+                this.bass.volume.value = -8;
+
+                this.lead = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "fmtriangle", modulationType: "sine", modulationIndex: 2, harmonicity: 2 },
+                    envelope: { attack: 0.01, decay: 1.5, sustain: 0.1, release: 2.0 }
+                }).connect(this.delay).connect(this.reverb).toDestination();
+                this.lead.volume.value = -20;
+
+                this.pad = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "sine" },
+                    envelope: { attack: 1.5, decay: 1.0, sustain: 0.8, release: 3.0 }
+                }).connect(this.reverb).toDestination();
+                this.pad.volume.value = -22;
+
+                this.sfx = new Tone.PolySynth(Tone.Synth).toDestination();
+                this.sfx.volume.value = -6;
             }
 
             generateProceduralSong() {
-                this.bpm = Math.floor(Math.random() * 41) + 100;
+                this.bpm = Math.floor(Math.random() * 11) + 130;
                 this.evolveSong();
             }
 
             evolveSong() {
-                const synthTypes = ['square', 'sawtooth', 'triangle'];
-                const leadTypes = ['square', 'sawtooth', 'sine', 'triangle'];
+                const bassTypes = ['sawtooth', 'square', 'fmtriangle'];
+                const leadTypes = ['sine', 'sawtooth', 'fmsquare', 'triangle'];
 
-                this.bassType = synthTypes[Math.floor(Math.random() * synthTypes.length)];
-                this.leadType = leadTypes[Math.floor(Math.random() * leadTypes.length)];
+                this.bass.set({ oscillator: { type: bassTypes[Math.floor(Math.random() * bassTypes.length)] } });
+                this.lead.set({ oscillator: { type: leadTypes[Math.floor(Math.random() * leadTypes.length)] } });
 
-                const baseFreq = 45 + Math.random() * 40;
+                const baseFreq = 43.65;
                 const getFreq = (semitones) => baseFreq * Math.pow(2, semitones / 12);
 
                 const progressions = [
+                    [0, 8, 10, 0],
                     [0, 8, 3, 10],
-                    [0, 5, 7, 0],
-                    [0, 3, 7, 5],
-                    [0, 8, 5, 7],
-                    [0, 10, 8, 7],
-                    [0, 0, 8, 10]
+                    [0, 5, 8, 7],
+                    [8, 10, 0, 0]
                 ];
 
                 const prog = progressions[Math.floor(Math.random() * progressions.length)];
@@ -508,31 +527,34 @@
 
                     return {
                         root: root,
-                        arp: [
-                            root,
-                            root * Math.pow(2, third / 12),
-                            root * Math.pow(2, 7 / 12),
-                            root * 2
-                        ]
+                        chord: [root * 4, root * 4 * Math.pow(2, third / 12), root * 4 * Math.pow(2, 7 / 12)],
+                        arp: [root * 8, root * 8 * Math.pow(2, third / 12), root * 8 * Math.pow(2, 7 / 12), root * 16]
                     };
                 });
             }
 
-            start() {
-                if (this.ctx.state === 'suspended') this.ctx.resume();
-
-                if ('speechSynthesis' in window) {
-                    let u = new SpeechSynthesisUtterance('');
-                    u.volume = 0;
-                    window.speechSynthesis.speak(u);
-                }
-
+            async start() {
+                await Tone.start();
                 if (this.isPlaying) return;
                 this.isPlaying = true;
+                this.kickTimes = [];
+                this.arpIndex = 0;
 
                 this.generateProceduralSong();
 
-                this.nextNoteTime = this.ctx.currentTime + 0.1;
+                const beatDuration = 60 / this.bpm;
+                const introBeats = 8;
+                const introDuration = introBeats * beatDuration;
+
+                const now = Tone.now();
+                for (let i = 0; i < introBeats; i++) {
+                    const kTime = now + (i * beatDuration);
+                    this.kick.triggerAttackRelease("C1", "8n", kTime);
+                    this.kickTimes.push(kTime);
+                }
+
+                this.nextNoteTime = now + introDuration - this.AUDIO_LOOKAHEAD;
+
                 this.step = 0;
                 this.bar = 0;
                 this.schedule();
@@ -541,53 +563,53 @@
             stop() {
                 this.isPlaying = false;
                 cancelAnimationFrame(this.timerID);
-            }
-
-            playTone(freq, type, attack, decay, vol, slideFreq = null) {
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-
-                osc.type = type;
-                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-                if (slideFreq) osc.frequency.exponentialRampToValueAtTime(slideFreq, this.ctx.currentTime + attack + decay);
-
-                gain.gain.setValueAtTime(0.001, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(vol, this.ctx.currentTime + attack);
-                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + attack + decay);
-
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start(this.ctx.currentTime);
-                osc.stop(this.ctx.currentTime + attack + decay);
-            }
-
-            playNoise(decay, vol, filterType = 'highpass', filterFreq = 5000) {
-                const bufferSize = this.ctx.sampleRate * decay;
-                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
-                const noise = this.ctx.createBufferSource();
-                noise.buffer = buffer;
-                const gain = this.ctx.createGain();
-                const filter = this.ctx.createBiquadFilter();
-
-                filter.type = filterType;
-                filter.frequency.value = filterFreq;
-
-                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + decay);
-
-                noise.connect(filter);
-                filter.connect(gain);
-                gain.connect(this.ctx.destination);
-                noise.start(this.ctx.currentTime);
+                this.kickTimes = [];
             }
 
             schedule() {
                 if (!this.isPlaying) return;
-                while (this.nextNoteTime < this.ctx.currentTime + 0.1) {
-                    this.playSequenceStep(this.step, state.level);
+
+                if (this.nextNoteTime < Tone.now() - 0.5) {
+                    this.nextNoteTime = Tone.now() + 0.1;
+                }
+
+                while (this.nextNoteTime < Tone.now() + 0.1) {
+
+                    let playTime = this.nextNoteTime + this.AUDIO_LOOKAHEAD;
+                    let fallDuration = Math.max(0.5, 2.0 - ((state.level - 1) * 0.1));
+
+                    this.playSequenceStep(this.step, state.level, playTime);
+
+                    // Smooth real-time drain of the fever bar based on current step
+                    if (state.gameActive && state.isFeverActive) {
+                        state.fever = 100 - (((state.feverMeasures * 16) + this.step) / 128) * 100;
+                        updateUI();
+                    }
+
+                    if (state.gameActive) {
+                        let shouldSpawn = false;
+                        let isBug = false;
+                        let isDiamond = false;
+
+                        if (state.level === 1) shouldSpawn = (this.step % 4 === 0);
+                        else if (state.level === 2) shouldSpawn = (this.step % 4 === 0 || this.step === 10);
+                        else if (state.level >= 3) shouldSpawn = (this.step % 2 === 0);
+
+                        if (shouldSpawn) {
+                            state.notesSpawned++;
+                            if (state.notesSpawned >= state.nextBugAt) {
+                                isBug = true;
+                                state.nextBugAt = state.notesSpawned + Math.floor(Math.random() * 11) + 10;
+                            }
+
+                            // In Overdrive, normal notes become diamonds. Bugs remain bugs.
+                            if (state.isFeverActive && !isBug) {
+                                isDiamond = true;
+                            }
+
+                            notes.push(new Note(isBug, isDiamond, playTime, fallDuration));
+                        }
+                    }
 
                     this.step++;
                     if (this.step >= 16) {
@@ -600,121 +622,97 @@
                                 checkLevelUp();
                             }
 
-                            if (state.isFeverActive && !state.isSpecialDropping) {
+                            if (state.isFeverActive) {
                                 state.feverMeasures++;
-
-                                if (state.feverMeasures === 7) {
-                                    state.isClearingForSpecial = true;
-                                }
-
                                 if (state.feverMeasures >= 8) {
-                                    state.isClearingForSpecial = false;
-                                    state.isSpecialDropping = true;
+                                    // Survived all 8 measures flawlessly!
+                                    state.isFeverActive = false;
                                     state.fever = 0;
-
-                                    triggerShoutout("CATCH THIS!", 1.5);
-                                    notes.push(new Note(false, true));
-                                    updateUI();
-                                } else {
-                                    state.fever = 100 - (state.feverMeasures / 8) * 100;
-                                    updateUI();
-                                }
-                            } else if (state.isSuperRushActive) {
-                                state.superRushMeasures++;
-                                if (state.superRushMeasures >= 4) {
-                                    state.isSuperRushActive = false;
-                                    state.fever = 0;
-                                    feverFill.classList.remove('warp-active');
-
-                                    notes.forEach(note => {
-                                        for (let i = 0; i < 8; i++) particles.push(new Particle(note.x, note.y, note.color, true));
-                                    });
-                                    notes = [];
-                                    updateUI();
-                                } else {
-                                    state.fever = 100 - (state.superRushMeasures / 4) * 100;
+                                    state.score += 50000;
+                                    feverFill.classList.remove('overdrive-active');
+                                    triggerShoutout("OVERDRIVE CLEARED!\n+50,000", 1.5);
+                                    if (audioEngine) audioEngine.sfxLevelUp();
                                     updateUI();
                                 }
                             }
                         }
                     }
 
-                    let currentBpm = this.bpm + ((state.level - 1) * 10);
-                    if (state.isFeverActive) currentBpm += 15;
-                    if (state.isSuperRushActive) currentBpm *= 2.0;
-
+                    let currentBpm = this.bpm;
                     this.nextNoteTime += (60 / currentBpm) / 4;
                 }
                 this.timerID = requestAnimationFrame(() => this.schedule());
             }
 
-            playSequenceStep(step, level) {
+            playSequenceStep(step, level, time) {
                 const chord = this.chords[this.bar];
 
                 if (step % 4 === 0) {
-                    this.playTone(120, 'sine', 0.01, 0.4, 0.6, 40);
-                    if (state.gameActive) state.beatPulse = 1.0;
-                }
-                if (step % 4 === 0 || step === 10 || step === 14) {
-                    this.playTone(chord.root, this.bassType, 0.02, 0.3, 0.15);
+                    this.kick.triggerAttackRelease("C1", "8n", time);
+                    this.kickTimes.push(time);
                 }
 
-                if (level >= 2) {
-                    if (step % 8 === 4) {
-                        this.playNoise(0.2, 0.4, 'bandpass', 2000);
-                        this.playTone(200, 'triangle', 0.01, 0.2, 0.3, 100);
-                    }
-                    if (step % 2 !== 0) {
-                        this.playNoise(0.05, 0.1, 'highpass', 8000);
-                    }
+                if (level >= 2 && (step === 4 || step === 12)) {
+                    this.snare.triggerAttackRelease("16n", time);
                 }
 
-                if (level >= 3) {
-                    const arpFreq = chord.arp[step % 4];
-                    if (step % 2 === 0 || step % 3 === 0) {
-                        this.playTone(arpFreq, this.leadType, 0.05, 0.15, 0.08);
-                    }
+                if (level >= 2 && step % 2 !== 0) {
+                    this.hat.triggerAttackRelease("32n", time, 0.2);
+                } else if (level >= 2 && step % 4 === 2) {
+                    this.hat.triggerAttackRelease("16n", time, 0.4);
                 }
 
-                if (level >= 4) {
-                    this.playNoise(0.02, 0.05, 'highpass', 10000);
-                    if ((state.isFeverActive || state.isSuperRushActive) && step === 0) {
-                        this.playTone(chord.arp[3] * 2, 'sine', 0.5, 1.5, 0.05);
-                    }
+                if (step % 2 === 0 || step === 7 || step === 15) {
+                    this.bass.triggerAttackRelease(chord.root, "16n", time);
+                }
+
+                if (level >= 3 && step === 0) {
+                    this.pad.triggerAttackRelease(chord.chord, "1m", time);
                 }
             }
 
             sfxHit(perfect) {
-                if (perfect) {
-                    this.playTone(880, 'sine', 0.01, 0.1, 0.2);
-                    this.playTone(1318.5, 'sine', 0.01, 0.2, 0.15);
-                } else {
-                    this.playTone(440, 'triangle', 0.01, 0.1, 0.2);
+                const chord = this.chords[this.bar];
+                if (chord && chord.arp) {
+                    // Play the interactive melody line
+                    let arpFreq = chord.arp[this.arpIndex];
+                    if (state.isFeverActive) arpFreq *= 2;
+                    this.lead.triggerAttackRelease(arpFreq, "8n", Tone.now(), 0.4);
+                    this.arpIndex = (this.arpIndex + 1) % chord.arp.length;
+
+                    // Play perfectly harmonized percussion (no more out-of-key beeps!)
+                    if (perfect) {
+                        this.sfx.triggerAttackRelease(arpFreq * 2, "32n", Tone.now(), 0.2);
+                    } else {
+                        this.sfx.triggerAttackRelease(chord.root * 4, "32n", Tone.now(), 0.1);
+                    }
                 }
             }
-            sfxMiss() {
-                this.playTone(200, 'sawtooth', 0.05, 0.4, 0.3, 50);
-            }
+
             sfxLifeLost() {
-                this.playTone(150, 'sawtooth', 0.05, 0.6, 0.5, 20);
-                this.playNoise(0.6, 0.6, 'lowpass', 500);
+                const noise = new Tone.NoiseSynth({ envelope: { attack: 0.01, decay: 0.4 } }).toDestination();
+                noise.triggerAttackRelease("8n");
+                const synth = new Tone.Synth({ oscillator: { type: "square" } }).toDestination();
+                synth.triggerAttackRelease("C2", "8n");
+                synth.frequency.rampTo("C1", 0.3);
             }
             sfxExplosion() {
-                this.playNoise(0.6, 0.8, 'lowpass', 600);
-                this.playTone(150, 'sawtooth', 0.05, 0.5, 0.5, 10);
+                const noise = new Tone.NoiseSynth({ noise: { type: "brown" }, envelope: { attack: 0.01, decay: 0.8 } }).toDestination();
+                noise.triggerAttackRelease("2n");
             }
             sfxGameOver() {
-                this.playTone(200, 'sawtooth', 0.1, 2.0, 0.5, 30);
-                this.playTone(150, 'square', 0.1, 2.0, 0.5, 20);
-                this.playNoise(2.0, 0.8, 'lowpass', 500);
+                const synth = new Tone.Synth({ oscillator: { type: "pwm", modulationFrequency: 0.2 } }).toDestination();
+                synth.triggerAttackRelease("C2", "1n");
+                synth.frequency.rampTo("C0", 1.5);
             }
             sfxFever() {
-                this.playTone(400, 'sine', 0.1, 1.0, 0.2, 1200);
+                this.sfx.triggerAttackRelease(["C4", "E4", "G4", "C5"], "2n");
             }
             sfxLevelUp() {
-                this.playTone(440, 'sawtooth', 0.1, 0.2, 0.2, 880);
-                setTimeout(() => this.playTone(554, 'sawtooth', 0.1, 0.2, 0.2, 1108), 100);
-                setTimeout(() => this.playTone(659, 'sawtooth', 0.1, 0.4, 0.2, 1318), 200);
+                const time = Tone.now();
+                this.sfx.triggerAttackRelease("A4", "16n", time);
+                this.sfx.triggerAttackRelease("C#5", "16n", time + 0.1);
+                this.sfx.triggerAttackRelease("E5", "8n", time + 0.2);
             }
         }
 
@@ -724,7 +722,6 @@
             canvas.height = window.innerHeight;
 
             const renderWidth = Math.min(window.innerWidth * 0.9, 450);
-
             config.targetY = canvas.height - 120;
             const laneWidth = renderWidth / config.laneCount;
 
@@ -761,9 +758,12 @@
         }
 
         class Note {
-            constructor(isBug = false, isSpecial = false) {
+            constructor(isBug = false, isDiamond = false, targetTime, fallDuration) {
                 this.isBug = isBug;
-                this.isSpecial = isSpecial;
+                this.isDiamond = isDiamond;
+                this.targetTime = targetTime;
+                this.fallDuration = fallDuration;
+
                 this.lane = Math.floor(Math.random() * config.laneCount);
                 this.x = lanes[this.lane];
                 this.y = -50;
@@ -774,24 +774,24 @@
 
                 if (this.isBug) {
                     this.color = '#f0f';
-                } else if (this.isSpecial) {
+                } else if (this.isDiamond) {
                     this.color = '#c084fc';
                     this.size = 45;
                 } else {
                     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
-                    this.color = (state.isFeverActive || state.isSuperRushActive) ? '#a855f7' : (colors[Math.min(state.level - 1, 3)] || '#ec4899');
+                    this.color = state.isFeverActive ? '#a855f7' : (colors[Math.min(state.level - 1, 3)] || '#ec4899');
                 }
             }
-            update(dt) {
-                let speedMultiplier = 1 + ((state.level - 1) * 0.2);
-                if (state.isFeverActive) speedMultiplier += 0.3;
-                if (state.isSuperRushActive) speedMultiplier *= 10.0;
-                if (this.isSpecial) speedMultiplier *= 2.0;
 
-                this.y += config.baseNoteSpeed * speedMultiplier * dt;
+            update(dt) {
+                const timeRemaining = this.targetTime - Tone.now();
+                const totalDistance = config.targetY + 50;
+
+                const progress = 1 - (timeRemaining / this.fallDuration);
+                this.y = -50 + (totalDistance * progress);
 
                 const dist = Math.abs(this.y - config.targetY);
-                if (dist < 150 && !this.isBug && !this.isSpecial) {
+                if (dist < 150 && !this.isBug && !this.isDiamond) {
                     this.stretchY = 1.3;
                     this.stretchX = 0.7;
                 } else {
@@ -799,12 +799,13 @@
                     this.stretchX = 1;
                 }
             }
+
             draw() {
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 ctx.scale(this.stretchX, this.stretchY);
 
-                ctx.shadowBlur = this.isSpecial ? 0 : 20;
+                ctx.shadowBlur = this.isDiamond ? 0 : 20;
                 ctx.shadowColor = this.color;
 
                 if (this.isBug) {
@@ -823,7 +824,7 @@
                     ctx.fillRect(-this.size / 2, -this.size / 2 + yOffset1, this.size, 3);
                     ctx.fillRect(-this.size / 2, -this.size / 2 + yOffset2, this.size, 5);
 
-                } else if (this.isSpecial) {
+                } else if (this.isDiamond) {
                     ctx.fillStyle = this.color;
                     ctx.beginPath();
                     ctx.moveTo(0, -this.size);
@@ -861,36 +862,6 @@
             }
         }
 
-        function spawnNote() {
-            if (!state.gameActive) return;
-
-            let spawnMultiplier = 1 + ((state.level - 1) * 0.15);
-            if (state.isFeverActive) spawnMultiplier += 0.2;
-            if (state.isSuperRushActive) spawnMultiplier *= 10.0;
-
-            const delay = (1000 / (config.baseSpawnRate * spawnMultiplier));
-
-            if (state.isClearingForSpecial || state.isSpecialDropping) {
-                spawnTimeout = setTimeout(spawnNote, delay);
-                return;
-            }
-
-            state.notesSpawned++;
-            let isBug = false;
-            if (state.notesSpawned >= state.nextBugAt) {
-                isBug = true;
-                state.nextBugAt = state.notesSpawned + Math.floor(Math.random() * 11) + 10;
-            }
-
-            if (state.isSuperRushActive && isBug) {
-                isBug = false;
-            }
-
-            notes.push(new Note(isBug, false));
-
-            spawnTimeout = setTimeout(spawnNote, delay);
-        }
-
         function triggerHit(laneIndex) {
             if (!state.gameActive) return;
 
@@ -899,7 +870,7 @@
 
             notes.forEach((note, index) => {
                 if (note.lane === laneIndex && !note.hit) {
-                    const diff = Math.abs(note.y - config.targetY);
+                    const diff = Math.abs(note.targetTime - Tone.now());
                     if (diff < config.hitRange && diff < minTime) {
                         minTime = diff;
                         hitNote = { note, index, diff };
@@ -908,17 +879,10 @@
             });
 
             if (hitNote) {
-                if (hitNote.note.isBug) {
-                    processBugHit(hitNote.note, hitNote.index);
-                } else if (hitNote.note.isSpecial) {
-                    processSpecialHit(hitNote.note, hitNote.index);
-                } else {
-                    processHit(hitNote);
-                }
+                if (hitNote.note.isBug) processBugHit(hitNote.note, hitNote.index);
+                else processHit(hitNote);
             } else {
-                if (!state.isSuperRushActive) {
-                    processMistap();
-                }
+                processMistap();
             }
         }
 
@@ -937,14 +901,8 @@
 
             if (state.isFeverActive) {
                 state.isFeverActive = false;
-                state.isClearingForSpecial = false;
-                state.isSpecialDropping = false;
                 feverFill.classList.remove('overdrive-active');
-                triggerShoutout("PULSE BROKEN!", 0.5);
-            }
-            if (state.isSuperRushActive) {
-                state.isSuperRushActive = false;
-                feverFill.classList.remove('warp-active');
+                triggerShoutout("OVERDRIVE FAILED!", 0.5);
             }
 
             if (audioEngine) audioEngine.sfxLifeLost();
@@ -953,33 +911,6 @@
             updateUI();
 
             if (state.lives <= 0) endGame();
-        }
-
-        function processSpecialHit(note, index) {
-            note.hit = true;
-            for (let i = 0; i < 60; i++) particles.push(new Particle(note.x, note.y, '#22d3ee', true));
-            notes.splice(index, 1);
-
-            state.isFeverActive = false;
-            state.isClearingForSpecial = false;
-            state.isSpecialDropping = false;
-            feverFill.classList.remove('overdrive-active');
-
-            activateSuperRushMode();
-        }
-
-        function activateSuperRushMode() {
-            state.isSuperRushActive = true;
-            state.superRushMeasures = 0;
-            state.fever = 100;
-            state.shake = 60;
-
-            if (audioEngine) audioEngine.sfxLevelUp();
-            triggerShoutout("WARP SPEED!!!", 0.3);
-
-            feverFill.style.background = 'linear-gradient(90deg, #22d3ee, #818cf8)';
-            feverFill.classList.add('warp-active');
-            updateUI();
         }
 
         function processBugHit(note, index) {
@@ -993,13 +924,8 @@
 
             if (state.isFeverActive) {
                 state.isFeverActive = false;
-                state.isClearingForSpecial = false;
-                state.isSpecialDropping = false;
                 feverFill.classList.remove('overdrive-active');
-            }
-            if (state.isSuperRushActive) {
-                state.isSuperRushActive = false;
-                feverFill.classList.remove('warp-active');
+                triggerShoutout("OVERDRIVE FAILED!", 0.5);
             }
 
             if (audioEngine) audioEngine.sfxExplosion();
@@ -1027,7 +953,7 @@
 
             const basePoints = isPerfect ? 100 : 50;
             const levelMultiplier = state.level;
-            const feverMultiplier = state.isFeverActive ? 4 : (state.isSuperRushActive ? 2 : 1);
+            const feverMultiplier = state.isFeverActive ? 4 : 1;
 
             state.score += (basePoints * levelMultiplier * feverMultiplier);
             state.streak++;
@@ -1038,22 +964,21 @@
             else if (state.streak === 50) triggerShoutout("50 COMBO!!", 1.5);
             else if (state.streak === 100) triggerShoutout("UNSTOPPABLE!!", 1.8);
 
-            if (!state.isFeverActive && !state.isSuperRushActive) {
+            if (!state.isFeverActive) {
                 state.fever = Math.min(100, state.fever + (isPerfect ? 5 : 2));
                 if (state.fever >= 100) activateFever();
             }
 
             if (audioEngine) audioEngine.sfxHit(isPerfect);
 
-            const isChaotic = state.isFeverActive || state.isSuperRushActive;
+            const isChaotic = state.isFeverActive;
             const pCount = isChaotic ? 100 : (isPerfect ? 25 : 10);
             const color = isChaotic ? (Math.random() > 0.5 ? '#a855f7' : '#fff') : (isPerfect ? '#fbbf24' : note.color);
             for (let i = 0; i < pCount; i++) particles.push(new Particle(note.x, note.y, color, isChaotic));
 
             state.shake = isChaotic ? 30 : (isPerfect ? 12 : 5);
 
-            if (state.isSuperRushActive) showFeedback('AUTO!', '#22d3ee');
-            else showFeedback(isChaotic ? 'INSANE!' : (isPerfect ? 'PERFECT' : 'GOOD'), isChaotic ? '#a855f7' : '#fff');
+            showFeedback(isChaotic ? 'INSANE!' : (isPerfect ? 'PERFECT' : 'GOOD'), isChaotic ? '#a855f7' : '#fff');
 
             updateUI();
             notes.splice(index, 1);
@@ -1074,14 +999,8 @@
 
             if (state.isFeverActive) {
                 state.isFeverActive = false;
-                state.isClearingForSpecial = false;
-                state.isSpecialDropping = false;
                 feverFill.classList.remove('overdrive-active');
-                triggerShoutout("PULSE BROKEN!", 0.5);
-            }
-            if (state.isSuperRushActive) {
-                state.isSuperRushActive = false;
-                feverFill.classList.remove('warp-active');
+                triggerShoutout("OVERDRIVE FAILED!", 0.5);
             }
 
             if (audioEngine) audioEngine.sfxLifeLost();
@@ -1091,7 +1010,7 @@
             notes.forEach(n => {
                 for (let i = 0; i < 8; i++) particles.push(new Particle(n.x, n.y, n.color, true));
             });
-            notes = []; // Wipe the screen to give a breather
+            notes = [];
 
             updateUI();
 
@@ -1103,11 +1022,9 @@
             state.shake = 25;
             triggerShoutout(`LEVEL ${state.level}!`, 1.5);
 
-            if (state.level > 4 && audioEngine) {
-                audioEngine.evolveSong();
-            }
-
+            if (state.level > 4 && audioEngine) audioEngine.evolveSong();
             if (audioEngine) audioEngine.sfxLevelUp();
+
             updateUI();
         }
 
@@ -1119,7 +1036,7 @@
             feverFill.style.background = 'linear-gradient(90deg, #ec4899, #a855f7)';
 
             if (audioEngine) audioEngine.sfxFever();
-            triggerShoutout("OVERDRIVE!", 2.0);
+            triggerShoutout("OVERDRIVE! SURVIVE!", 2.0);
             feverFill.classList.add('overdrive-active');
             updateUI();
         }
@@ -1134,7 +1051,6 @@
         }
 
         function getRetroHeart() {
-            // Procedurally draws a perfect 8-bit retro pixel heart
             return `<svg class="w-12 h-12" viewBox="0 0 11 11" style="shape-rendering: crispEdges; fill: currentColor;">
             <rect x="2" y="1" width="2" height="1"/>
             <rect x="7" y="1" width="2" height="1"/>
@@ -1157,7 +1073,6 @@
             for (let i = 0; i < state.lives; i++) {
                 html += `<span class="inline-block">${getRetroHeart()}</span>`;
             }
-            // The heart that represents the life just lost shatters
             html += `<span class="heart-shatter">${getRetroHeart()}</span>`;
 
             container.innerHTML = html;
@@ -1177,13 +1092,11 @@
             feverFill.style.width = state.fever + '%';
         }
 
-        function startGame() {
+        async function startGame() {
             cancelAnimationFrame(menuAnimId);
 
             if (!audioEngine) audioEngine = new AudioEngine();
-            audioEngine.start();
-
-            clearTimeout(spawnTimeout);
+            await audioEngine.start();
 
             state = {
                 score: 0,
@@ -1194,10 +1107,6 @@
                 lives: 5,
                 isFeverActive: false,
                 feverMeasures: 0,
-                isClearingForSpecial: false,
-                isSpecialDropping: false,
-                isSuperRushActive: false,
-                superRushMeasures: 0,
                 gameActive: true,
                 lastFrame: performance.now(),
                 shake: 0,
@@ -1210,20 +1119,18 @@
             particles = [];
             lanePulses = [0, 0, 0, 0];
             feverFill.style.background = 'linear-gradient(90deg, #ec4899, #a855f7)';
-            feverFill.classList.remove('overdrive-active', 'warp-active');
+            feverFill.classList.remove('overdrive-active');
 
             menu.classList.add('hidden');
             gameOverScreen.classList.add('hidden');
 
-            triggerShoutout("BEGIN!", 1.0);
+            triggerShoutout("GET READY!", 1.0);
             updateUI();
-            spawnNote();
             requestAnimationFrame(gameLoop);
         }
 
         function endGame() {
             state.gameActive = false;
-            clearTimeout(spawnTimeout);
             if (audioEngine) {
                 audioEngine.stop();
                 audioEngine.sfxGameOver();
@@ -1251,6 +1158,13 @@
             if (state.shake > 0) state.shake -= dt * 50;
             if (state.beatPulse > 0) state.beatPulse -= dt * 4;
 
+            if (audioEngine && audioEngine.kickTimes.length > 0) {
+                while (audioEngine.kickTimes.length > 0 && Tone.now() >= audioEngine.kickTimes[0]) {
+                    state.beatPulse = 1.0;
+                    audioEngine.kickTimes.shift();
+                }
+            }
+
             for (let i = 0; i < lanePulses.length; i++) {
                 if (lanePulses[i] > 0) lanePulses[i] -= dt * 4;
             }
@@ -1261,29 +1175,14 @@
 
                 n.update(dt);
 
-                if (state.isSuperRushActive && !n.hit && !n.isBug && n.y >= config.targetY) {
-                    lanePulses[n.lane] = 1.0;
-                    processHit({ note: n, index: i, diff: 0 });
-                    continue;
-                }
-
-                if (n.y > canvas.height + 20) {
+                if (Tone.now() > n.targetTime + config.hitRange) {
                     if (!n.hit) {
-                        if (n.isSpecial) {
-                            state.isFeverActive = false;
-                            state.isSpecialDropping = false;
-                            feverFill.classList.remove('overdrive-active');
-                            state.fever = 0;
-                            updateUI();
-                            notes.splice(i, 1);
-                        } else if (!n.isBug) {
+                        if (!n.isBug) {
                             processMissedNote();
-                            break; // Stop updating remaining notes since array was wiped
+                            break;
                         } else {
-                            notes.splice(i, 1); // Avoided a bug!
+                            notes.splice(i, 1);
                         }
-                    } else {
-                        notes.splice(i, 1); // Clean up hit notes passing screen bottom
                     }
                 }
             }
@@ -1297,13 +1196,8 @@
         function draw() {
             const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
 
-            if (state.isSuperRushActive) {
-                bgGrad.addColorStop(0, '#0f172a');
-                bgGrad.addColorStop(1, '#083344');
-            } else {
-                bgGrad.addColorStop(0, '#0f172a');
-                bgGrad.addColorStop(1, state.isFeverActive ? '#4c1d95' : '#1e1b4b');
-            }
+            bgGrad.addColorStop(0, '#0f172a');
+            bgGrad.addColorStop(1, state.isFeverActive ? '#4c1d95' : '#1e1b4b');
 
             ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1322,12 +1216,10 @@
             }
 
             const time = performance.now() / 1000;
-            const speed = 100 * (1 + (state.level * 0.2)) * (state.isSuperRushActive ? 10 : 1);
+            const speed = 100 * (1 + (state.level * 0.2));
             const gridY = (time * speed) % 80;
 
-            let gridColor = 'rgba(236, 72, 153, 0.15)';
-            if (state.isFeverActive) gridColor = 'rgba(168, 85, 247, 0.3)';
-            if (state.isSuperRushActive) gridColor = 'rgba(34, 211, 238, 0.3)';
+            let gridColor = state.isFeverActive ? 'rgba(168, 85, 247, 0.3)' : 'rgba(236, 72, 153, 0.15)';
 
             if (state.beatPulse > 0.1) {
                 ctx.shadowBlur = state.beatPulse * 15;
@@ -1364,7 +1256,7 @@
 
                 if (lanePulses[i] > 0) {
                     const pulseGrad = ctx.createLinearGradient(0, config.targetY, 0, 0);
-                    const color = state.isSuperRushActive ? '34, 211, 238' : (state.isFeverActive ? '168, 85, 247' : '236, 72, 153');
+                    const color = state.isFeverActive ? '168, 85, 247' : '236, 72, 153';
                     pulseGrad.addColorStop(0, `rgba(${color}, ${lanePulses[i] * 0.5})`);
                     pulseGrad.addColorStop(1, `rgba(${color}, 0)`);
                     ctx.fillStyle = pulseGrad;
@@ -1372,15 +1264,14 @@
                 }
             });
 
-            // Target Zone
-            ctx.fillStyle = state.isSuperRushActive ? 'rgba(34, 211, 238, 0.2)' : (state.isFeverActive ? 'rgba(168, 85, 247, 0.2)' : 'rgba(255,255,255,0.05)');
+            ctx.fillStyle = state.isFeverActive ? 'rgba(168, 85, 247, 0.2)' : 'rgba(255,255,255,0.05)';
             ctx.beginPath();
             const startX = lanes[0] - (laneWidth / 2) + 10;
             ctx.roundRect(startX, config.targetY - 20, renderWidth - 20, 40, 10);
             ctx.fill();
             ctx.shadowBlur = 15;
-            ctx.shadowColor = state.isSuperRushActive ? '#22d3ee' : (state.isFeverActive ? '#a855f7' : '#ec4899');
-            ctx.strokeStyle = state.isSuperRushActive ? '#22d3ee' : (state.isFeverActive ? '#a855f7' : 'rgba(236, 72, 153, 0.8)');
+            ctx.shadowColor = state.isFeverActive ? '#a855f7' : '#ec4899';
+            ctx.strokeStyle = state.isFeverActive ? '#a855f7' : 'rgba(236, 72, 153, 0.8)';
             ctx.lineWidth = 2;
             ctx.stroke();
             ctx.shadowBlur = 0;
@@ -1393,7 +1284,6 @@
 
         function handleTap(laneIndex) {
             if (!audioEngine) return;
-            if (audioEngine.ctx.state === 'suspended') audioEngine.ctx.resume();
             lanePulses[laneIndex] = 1.0;
             triggerHit(laneIndex);
         }
