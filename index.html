@@ -846,13 +846,24 @@
                     ctx.lineTo(this.x, tailY);
                     ctx.stroke();
 
-                    // Active tracking glow
+                    // Active tracking feedback
                     if (this.isTracking) {
-                        ctx.shadowBlur = 15;
+                        ctx.shadowBlur = 20;
                         ctx.shadowColor = '#10b981';
+                        
+                        // Circular Progress Ring
+                        ctx.beginPath();
+                        ctx.arc(this.x, config.targetY, this.size * 1.2, -Math.PI/2, (-Math.PI/2) + (Math.PI * 2 * (1 - this.holdProgress)));
                         ctx.strokeStyle = '#fff';
                         ctx.lineWidth = 4;
                         ctx.stroke();
+                        ctx.shadowBlur = 0;
+
+                        // "HOLD" Prompt
+                        ctx.fillStyle = '#fff';
+                        ctx.font = 'bold 16px Inter, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('HOLD!', this.x, config.targetY - this.size - 10);
                     }
                 }
 
