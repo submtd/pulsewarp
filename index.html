@@ -602,12 +602,20 @@
                                 state.nextBugAt = state.notesSpawned + Math.floor(Math.random() * 11) + 10;
                             }
 
+                            // Randomly spawn hold notes from level 3 onwards
+                            let isHold = false;
+                            let duration = 0;
+                            if (state.level >= 3 && !isBug && Math.random() < 0.2) {
+                                isHold = true;
+                                duration = (60 / this.bpm); // 1 beat duration
+                            }
+
                             // In Overdrive, normal notes become diamonds. Bugs remain bugs.
                             if (state.isFeverActive && !isBug) {
                                 isDiamond = true;
                             }
 
-                            notes.push(new Note(isBug, isDiamond, playTime, fallDuration));
+                            notes.push(new Note(isBug, isDiamond, isHold, duration, playTime, fallDuration));
                         }
                     }
 
@@ -758,9 +766,11 @@
         }
 
         class Note {
-            constructor(isBug = false, isDiamond = false, targetTime, fallDuration) {
+            constructor(isBug = false, isDiamond = false, isHold = false, duration = 0, targetTime, fallDuration) {
                 this.isBug = isBug;
                 this.isDiamond = isDiamond;
+                this.isHold = isHold;
+                this.duration = duration;
                 this.targetTime = targetTime;
                 this.fallDuration = fallDuration;
 
@@ -768,6 +778,8 @@
                 this.x = lanes[this.lane];
                 this.y = -50;
                 this.hit = false;
+                this.isTracking = false;
+                this.holdProgress = 0;
                 this.size = 35;
                 this.stretchX = 1;
                 this.stretchY = 1;
@@ -777,6 +789,8 @@
                 } else if (this.isDiamond) {
                     this.color = '#c084fc';
                     this.size = 45;
+                } else if (this.isHold) {
+                    this.color = '#10b981';
                 } else {
                     const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
                     this.color = state.isFeverActive ? '#a855f7' : (colors[Math.min(state.level - 1, 3)] || '#ec4899');
@@ -784,14 +798,26 @@
             }
 
             update(dt) {
-                const timeRemaining = this.targetTime - Tone.now();
+                const now = Tone.now();
+                const timeRemaining = this.targetTime - now;
                 const totalDistance = config.targetY + 50;
 
                 const progress = 1 - (timeRemaining / this.fallDuration);
                 this.y = -50 + (totalDistance * progress);
 
+                if (this.isHold && this.isTracking) {
+                    const holdEndTime = this.targetTime + this.duration;
+                    this.holdProgress = Math.min(1, (now - this.targetTime) / this.duration);
+                    
+                    if (now >= holdEndTime) {
+                        this.hit = true;
+                        this.isTracking = false;
+                        processHoldComplete(this);
+                    }
+                }
+
                 const dist = Math.abs(this.y - config.targetY);
-                if (dist < 150 && !this.isBug && !this.isDiamond) {
+                if (dist < 150 && !this.isBug && !this.isDiamond && !this.isHold) {
                     this.stretchY = 1.3;
                     this.stretchX = 0.7;
                 } else {
@@ -801,11 +827,39 @@
             }
 
             draw() {
+                if (this.hit && !this.isHold) return;
+
                 ctx.save();
+                
+                // Draw Hold Trail
+                if (this.isHold) {
+                    const tailY = this.y - (this.duration / this.fallDuration) * (config.targetY + 50);
+                    const grad = ctx.createLinearGradient(this.x, tailY, this.x, this.y);
+                    grad.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
+                    grad.addColorStop(1, this.isTracking ? '#10b981' : 'rgba(16, 185, 129, 0.6)');
+                    
+                    ctx.strokeStyle = grad;
+                    ctx.lineWidth = this.size * 0.8;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(this.x, tailY);
+                    ctx.stroke();
+
+                    // Active tracking glow
+                    if (this.isTracking) {
+                        ctx.shadowBlur = 15;
+                        ctx.shadowColor = '#10b981';
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 4;
+                        ctx.stroke();
+                    }
+                }
+
                 ctx.translate(this.x, this.y);
                 ctx.scale(this.stretchX, this.stretchY);
 
-                ctx.shadowBlur = this.isDiamond ? 0 : 20;
+                ctx.shadowBlur = (this.isDiamond || (this.isHold && !this.isTracking)) ? 0 : 20;
                 ctx.shadowColor = this.color;
 
                 if (this.isBug) {
@@ -847,6 +901,14 @@
                     ctx.closePath();
                     ctx.fill();
 
+                } else if (this.isHold) {
+                    ctx.fillStyle = this.isTracking ? '#fff' : this.color;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.size / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
                 } else {
                     const grad = ctx.createLinearGradient(0, -this.size / 2, 0, this.size / 2);
                     grad.addColorStop(0, '#ffffff');
@@ -862,7 +924,7 @@
             }
         }
 
-        function triggerHit(laneIndex) {
+        function triggerHit(laneIndex, silent = false) {
             if (!state.gameActive) return;
 
             let hitNote = null;
@@ -881,7 +943,7 @@
             if (hitNote) {
                 if (hitNote.note.isBug) processBugHit(hitNote.note, hitNote.index);
                 else processHit(hitNote);
-            } else {
+            } else if (!silent && (state.fever < 100 || state.isFeverActive)) {
                 processMistap();
             }
         }
@@ -948,9 +1010,20 @@
         }
 
         function processHit({ note, index, diff }) {
-            note.hit = true;
             const isPerfect = diff < config.perfectZone;
+            const now = Tone.now();
+            const isLate = now > note.targetTime;
+            const timingText = isPerfect ? '' : (isLate ? ' (LATE)' : ' (EARLY)');
 
+            if (note.isHold) {
+                note.isTracking = true;
+                note.hit = true; // Mark as initiated
+                showFeedback((isPerfect ? 'SUSTAIN' : 'HOLD') + timingText, '#10b981');
+                if (audioEngine) audioEngine.sfxHit(isPerfect);
+                return;
+            }
+
+            note.hit = true;
             const basePoints = isPerfect ? 100 : 50;
             const levelMultiplier = state.level;
             const feverMultiplier = state.isFeverActive ? 4 : 1;
@@ -966,7 +1039,7 @@
 
             if (!state.isFeverActive) {
                 state.fever = Math.min(100, state.fever + (isPerfect ? 5 : 2));
-                if (state.fever >= 100) activateFever();
+                // No longer automatic: if (state.fever >= 100) activateFever();
             }
 
             if (audioEngine) audioEngine.sfxHit(isPerfect);
@@ -978,10 +1051,28 @@
 
             state.shake = isChaotic ? 30 : (isPerfect ? 12 : 5);
 
-            showFeedback(isChaotic ? 'INSANE!' : (isPerfect ? 'PERFECT' : 'GOOD'), isChaotic ? '#a855f7' : '#fff');
+            showFeedback((isChaotic ? 'INSANE!' : (isPerfect ? 'PERFECT' : 'GOOD')) + timingText, isChaotic ? '#a855f7' : '#fff');
 
             updateUI();
             notes.splice(index, 1);
+        }
+
+        function processHoldComplete(note) {
+            const index = notes.indexOf(note);
+            if (index > -1) {
+                state.score += (500 * state.level * (state.isFeverActive ? 4 : 1));
+                state.streak++;
+                state.maxStreak = Math.max(state.streak, state.maxStreak);
+                
+                showFeedback('COMPLETE!', '#10b981');
+                if (audioEngine) audioEngine.sfxLevelUp();
+                
+                const pCount = 30;
+                for (let i = 0; i < pCount; i++) particles.push(new Particle(note.x, config.targetY, '#10b981', false));
+                
+                updateUI();
+                notes.splice(index, 1);
+            }
         }
 
         function processMissedNote() {
@@ -1029,6 +1120,8 @@
         }
 
         function activateFever() {
+            if (state.fever < 100 || state.isFeverActive) return;
+            
             state.isFeverActive = true;
             state.feverMeasures = 0;
             state.shake = 35;
@@ -1215,6 +1308,16 @@
                 ctx.translate(-canvas.width / 2, -canvas.height / 2);
             }
 
+            // Radial Blur / Ghosting effect during Overdrive
+            if (state.isFeverActive) {
+                ctx.globalAlpha = 0.3;
+                for (let i = 1; i <= 3; i++) {
+                    const offset = i * Math.sin(performance.now() / 100) * 5;
+                    ctx.drawImage(canvas, offset, offset);
+                }
+                ctx.globalAlpha = 1.0;
+            }
+
             const time = performance.now() / 1000;
             const speed = 100 * (1 + (state.level * 0.2));
             const gridY = (time * speed) % 80;
@@ -1282,18 +1385,36 @@
             ctx.restore();
         }
 
+        let lastTapTime = 0;
         function handleTap(laneIndex) {
             if (!audioEngine) return;
+            
+            // Manual Overdrive Activation: Double tap
+            const now = performance.now();
+            let silentHit = false;
+            if (now - lastTapTime < 250 && state.fever >= 100 && !state.isFeverActive) {
+                activateFever();
+                silentHit = true; // Don't penalize if this second tap doesn't hit a note
+            }
+            lastTapTime = now;
+
             lanePulses[laneIndex] = 1.0;
-            triggerHit(laneIndex);
+            triggerHit(laneIndex, silentHit);
         }
 
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space') {
                 e.preventDefault();
-                const nextNote = notes.find(n => !n.hit && !n.isBug);
-                const lane = nextNote ? nextNote.lane : Math.floor(Math.random() * config.laneCount);
-                handleTap(lane);
+                if (state.fever >= 100 && !state.isFeverActive) {
+                    activateFever();
+                    // Also try to hit the nearest note so activation doesn't skip it
+                    const nextNote = notes.find(n => !n.hit && !n.isBug);
+                    if (nextNote) triggerHit(nextNote.lane, true);
+                } else {
+                    const nextNote = notes.find(n => !n.hit && !n.isBug);
+                    const lane = nextNote ? nextNote.lane : Math.floor(Math.random() * config.laneCount);
+                    handleTap(lane);
+                }
             }
             if (['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) {
                 const lane = parseInt(e.key) - 1;
@@ -1329,6 +1450,26 @@
                 handleTap(laneIndex);
             }
         });
+
+        function handleRelease(laneIndex) {
+            const activeHold = notes.find(n => n.lane === laneIndex && n.isHold && n.isTracking);
+            if (activeHold) {
+                const now = Tone.now();
+                const holdEndTime = activeHold.targetTime + activeHold.duration;
+                
+                // Allow a small leniency for early release (0.1s)
+                if (now < holdEndTime - 0.1) {
+                    activeHold.isTracking = false;
+                    showFeedback('INCOMPLETE', '#ef4444');
+                    if (audioEngine) audioEngine.sfxLifeLost();
+                    state.streak = 0;
+                    updateUI();
+                    
+                    // Note remains but stops tracking, will eventually be missed/removed
+                }
+            }
+        }
+
     </script>
 </body>
 
